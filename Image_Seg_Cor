@@ -1,0 +1,238 @@
+from __main__ import vtk, qt, ctk, slicer
+import vtkSegmentationCorePython as vtkSegmentationCore
+
+#
+# CSISegCor
+# Cubic Spline Image Segmentation Correction
+class CSISegCor:
+
+    def __init__(self, parent):
+
+        parent.title = "Image Segmentation Correction"
+        parent.categories = ["Exemple"]
+        parent.dependencies = []
+        parent.contributors = ["Abdelkhalek Bakkari "]
+
+class CSISegCorWidget:
+
+    def __init__(self, parent=None):
+
+        if not parent:
+            self.parent = slicer.qMRMLWidget()
+            self.parent.setLayout(qt.QVBoxLayout())
+            self.parent.setMRMLScene(slicer.mrmlScene)
+        else:
+            self.parent = parent
+        self.layout = self.parent.layout()
+        if not parent:
+            self.setup()
+            self.parent.show()
+
+    def setup(self):
+
+        # create a callapsible button
+        collapsibleButton = ctk.ctkCollapsibleButton()
+        collapsibleButton.text = "Cubic Spline Image Segmentation Correction"
+
+        # bind collapsibleButton to root Layout
+        self.layout.addWidget(collapsibleButton)
+
+        # new layout for collapsible button
+        self.formLayout = qt.QFormLayout(collapsibleButton)
+
+        # volume selector
+        self.formFrame = qt.QFrame(collapsibleButton)
+        self.formFrame1 = qt.QFrame(collapsibleButton)
+        self.formFrame4 = qt.QFrame(collapsibleButton)
+        self.formFrame2 = qt.QFrame(collapsibleButton)
+        self.formFrame3 = qt.QFrame(collapsibleButton)
+
+        # set a layout to horizontal
+        self.formFrame.setLayout(qt.QHBoxLayout())
+        self.formFrame1.setLayout(qt.QHBoxLayout())
+        self.formFrame4.setLayout(qt.QHBoxLayout())
+        self.formFrame2.setLayout(qt.QHBoxLayout())
+        self.formFrame3.setLayout(qt.QHBoxLayout())
+
+        # bind a new frame to existing layout in collapsible menu
+        self.formLayout.addWidget(self.formFrame)
+        self.formLayout.addWidget(self.formFrame1)
+        self.formLayout.addWidget(self.formFrame4)
+        self.formLayout.addWidget(self.formFrame2)
+        self.formLayout.addWidget(self.formFrame3)
+
+        # creating new volume selector
+        self.inputSelector = qt.QLabel("Input Volume: ", self.formFrame)
+        self.formFrame.layout().addWidget(self.inputSelector)
+        self.inputSelector = slicer.qMRMLNodeComboBox(self.formFrame)
+        self.inputSelector.nodeTypes = (("vtkMRMLScalarVolumeNode"), "")
+        self.inputSelector.addEnabled = False
+        self.inputSelector.removeEnabled = False
+
+        self.inputSelector1 = qt.QLabel("Input segmentation: ", self.formFrame1)
+        self.formFrame1.layout().addWidget(self.inputSelector1)
+        self.inputSelector1 = slicer.qMRMLNodeComboBox(self.formFrame1)
+        self.inputSelector1.nodeTypes = (("vtkMRMLSegmentationNode"), "")
+        self.inputSelector1.addEnabled = False
+        self.inputSelector1.removeEnabled = False
+
+        self.inputSelector4 = qt.QLabel("Input transformation: ", self.formFrame4)
+        self.formFrame4.layout().addWidget(self.inputSelector4)
+        self.inputSelector4 = slicer.qMRMLNodeComboBox(self.formFrame4)
+        self.inputSelector4.nodeTypes = (("vtkMRMLTransformNode"), "")
+        self.inputSelector4.addEnabled = False
+        self.inputSelector4.removeEnabled = False
+
+        self.inputSelector2 = qt.QLabel("Set default Segmentation display : ", self.formFrame2)
+        self.formFrame2.layout().addWidget(self.inputSelector2)
+
+        self.inputSelector3 = qt.QLabel("Segmentation Correction: ", self.formFrame3)
+        self.formFrame3.layout().addWidget(self.inputSelector3)
+
+        # bind the current volume selector to the current scene of slicer
+        self.inputSelector.setMRMLScene(slicer.mrmlScene)
+        self.inputSelector1.setMRMLScene(slicer.mrmlScene)
+        self.inputSelector4.setMRMLScene(slicer.mrmlScene)
+
+        # bind the input selector to the frame
+        self.formFrame.layout().addWidget(self.inputSelector)
+        self.formFrame1.layout().addWidget(self.inputSelector1)
+        self.formFrame4.layout().addWidget(self.inputSelector4)
+
+        # testing
+        button = qt.QPushButton("Load Volume")
+        self.formFrame.layout().addWidget(button)
+        button.connect("clicked()", slicer.util.openAddVolumeDialog)
+        button.show()
+
+        # button for importing mesh files
+        button1 = qt.QPushButton("Load Segemntation")
+        self.formFrame1.layout().addWidget(button1)
+        button1.connect("clicked()", slicer.util.openAddSegmentationDialog)
+        button1.show()
+
+        # button for importing mesh files
+        button4 = qt.QPushButton("Load Transform")
+        self.formFrame4.layout().addWidget(button4)
+        button4.connect("clicked()", slicer.util.openAddTransformDialog)
+        button4.show()
+
+        # button for setting default segmentation display
+        button2 = qt.QPushButton("Set default")
+        self.formFrame2.layout().addWidget(button2)
+        button2.connect("clicked(bool)", self.SetDefaultValuesClicked)
+        button2.show()
+
+        # button for Final work
+        button3 = qt.QPushButton("Do corrections")
+        self.formFrame3.layout().addWidget(button3)
+        button3.connect("clicked(bool)", self.do_correctionsClicked)
+        button3.show()
+
+        
+
+    def SetDefaultValuesClicked(self):
+        if self.inputSelector1.currentNode():
+            segmentationNode = self.inputSelector1.currentNode()
+            TransformNode = self.inputSelector4.currentNode()
+            segmentation = segmentationNode.GetSegmentation()
+            segment = segmentation.GetSegment(segmentation.GetNthSegmentID(0))
+            segment.SetColor(1, 0, 0)
+            segmentationNode.GetDisplayNode().Visibility2DFillOff()
+
+            if TransformNode:
+                segmentationNode.SetAndObserveTransformNodeID(TransformNode.GetID())
+                print "transform successful"
+            print "color change successful"
+        else:
+            slicer.util.errorDisplay("No Segementation selected !")
+
+    def do_correctionsClicked(self):
+        # Copy and paste into Slicer Python interactor
+        # Drag visible fiducials to deform transform
+
+        # Scale defines how large cube will be created
+        # numPerEdge defines how many fiducials to put on each edge of the cube
+
+        scale = 30.0
+        numPerEdge = 5
+
+        # Create the FROM fiducial list, and hide it so it doesn't change with mouse interactions
+
+        fromFids = slicer.vtkMRMLMarkupsFiducialNode()
+        fromFids.SetName('FromFids')
+        slicer.mrmlScene.AddNode(fromFids)
+        for x in range(numPerEdge):
+            for y in range(numPerEdge):
+                for z in range(numPerEdge):
+                    cx = (x - float(numPerEdge - 1) / 2.0) * scale
+                    cy = (y - float(numPerEdge - 1) / 2.0) * scale
+                    cz = (z - float(numPerEdge - 1) / 2.0) * scale
+                    fromFids.AddFiducial(cx, cy, cz)
+
+        fromFids.GetDisplayNode().SetVisibility(False)
+
+        # Create the TO fiducial list, and make its label text invisibly small
+
+        toFids = slicer.vtkMRMLMarkupsFiducialNode()
+        toFids.SetName('T')
+        slicer.mrmlScene.AddNode(toFids)
+        for x in range(numPerEdge):
+            for y in range(numPerEdge):
+                for z in range(numPerEdge):
+                    cx = (x - float(numPerEdge - 1) / 2.0) * scale
+                    cy = (y - float(numPerEdge - 1) / 2.0) * scale
+                    cz = (z - float(numPerEdge - 1) / 2.0) * scale
+                    toFids.AddFiducial(cx, cy, cz)
+
+        toFids.GetDisplayNode().SetTextScale(0)
+
+        # Create the transform node to hold the deformable transformation later
+
+        tNode = slicer.vtkMRMLTransformNode()
+        tNode.SetName('TpsTransform')
+        slicer.mrmlScene.AddNode(tNode)
+
+        # Function that will be called whenever a TO fiducial moves and the transform needs an update
+
+        def updateTpsTransform(caller, eventid):
+            numPerEdge = fromFids.GetNumberOfFiducials()
+            if numPerEdge != toFids.GetNumberOfFiducials():
+                print
+                'Error: Fiducial numbers are not equal!'
+                return
+
+            fp = vtk.vtkPoints()
+            tp = vtk.vtkPoints()
+            f = [0, 0, 0]
+            t = [0, 0, 0]
+
+            for i in range(numPerEdge):
+                fromFids.GetNthFiducialPosition(i, f)
+                toFids.GetNthFiducialPosition(i, t)
+                fp.InsertNextPoint(f)
+                tp.InsertNextPoint(t)
+
+            tps = vtk.vtkThinPlateSplineTransform()
+            tps.SetSourceLandmarks(fp)
+            tps.SetTargetLandmarks(tp)
+            tps.SetBasisToR()
+            tNode.SetAndObserveTransformToParent(tps)
+
+        toFids.AddObserver(vtk.vtkCommand.ModifiedEvent, updateTpsTransform)
+
+        # A ROI annotation defines the region where the transform will be visualized
+
+        roi = self.inputSelector1.currentNode()
+        slicer.mrmlScene.AddNode(roi)
+        roi.SetDisplayVisibility(True)
+        # Set up transform visualization as gridlines
+
+        tNode.CreateDefaultDisplayNodes()
+        d = tNode.GetDisplayNode()
+        d.SetAndObserveRegionNode(roi)
+        d.SetVisualizationMode(slicer.vtkMRMLTransformDisplayNode.VIS_MODE_GRID)
+        d.SetVisibility(False)
+        roi.SetAndObserveTransformNodeID(tNode.GetID())
+        TransformNode = self.inputSelector4.currentNode()
+        tNode.SetAndObserveTransformNodeID(TransformNode.GetID())
